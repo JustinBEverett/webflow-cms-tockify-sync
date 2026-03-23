@@ -1,0 +1,6 @@
+.env
+.env-dev
+.claude
+node_modules
+package-lock.json
+__deployer__.zip
