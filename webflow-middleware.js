@@ -5,31 +5,32 @@ import slugify from 'slugify';
 
 dotenv.config();
 
-const webflow = await new WebflowClient({
-  accessToken: process.env.SITE_TOKEN,
-});
-const locationIds = await fetchLocationsFromWebflow();
-const categoryIds = await fetchCategoriesFromWebflow();
+function getClient(config) {
+  return new WebflowClient({ accessToken: config.siteToken });
+}
 
-export async function fetchCalendars() {
+export async function fetchCalendars(config) {
   try {
-    const resp = await webflow.collections.items.listItemsLive(process.env.CALENDAR_COLLECTION_ID);
+    const webflow = getClient(config);
+    console.log('Fetching calendars from Webflow using collection ID:', config.calendarCollectionId);
+    const resp = await webflow.collections.items.listItemsLive(config.calendarCollectionId);
 
-    const calendars = resp.items.map(item => ({
+    return resp.items.map(item => ({
       id: item.id,
       name: item.fieldData.name,
       slug: item.fieldData.slug,
       lastModified: item.fieldData['last-modified']
     }));
-    return calendars;
   } catch (error) {
     console.error('Error fetching collection items:', error);
     throw error;
   }
 }
-export async function updateCalendarLastModified(id, newLastModified) {
+
+export async function updateCalendarLastModified(id, newLastModified, config) {
   try {
-    await webflow.collections.items.updateItemsLive(process.env.CALENDAR_COLLECTION_ID, {
+    const webflow = getClient(config);
+    await webflow.collections.items.updateItemsLive(config.calendarCollectionId, {
       items: [{
         id: id,
         fieldData: {
@@ -44,14 +45,15 @@ export async function updateCalendarLastModified(id, newLastModified) {
   }
 }
 
-export async function getEventsFromWebflow(calendarSlug) {
+export async function getEventsFromWebflow(calendarSlug, config) {
   try {
+    const webflow = getClient(config);
     const allItems = [];
     let offset = 0;
     const limit = 100;
 
     while (true) {
-      const resp = await webflow.collections.items.listItemsLive(process.env.EVENT_COLLECTION_ID, { limit, offset });
+      const resp = await webflow.collections.items.listItemsLive(config.eventCollectionId, { limit, offset });
       allItems.push(...resp.items);
       if (resp.items.length < limit) break;
       offset += limit;
@@ -72,7 +74,7 @@ export async function getEventsFromWebflow(calendarSlug) {
   }
 }
 
-async function buildEventFieldData(event, calendarSlug, eventDetails) {
+async function buildEventFieldData(event, calendarSlug, eventDetails, locationIds, categoryIds) {
   return {
     name: event.name,
     'last-modified': event.lastModified.toISOString(),
@@ -99,13 +101,15 @@ async function buildEventFieldData(event, calendarSlug, eventDetails) {
   };
 }
 
-export async function createWebflowEvents(events, calendarSlug) {
+export async function createWebflowEvents(events, calendarSlug, config, locationIds, categoryIds) {
+  const webflow = getClient(config);
+
   for (const event of events) {
     try {
       const eventDetails = await fetchTockifyEventDetails(event.apiSlug, event.calendarSlug);
-      const fieldData = await buildEventFieldData(event, calendarSlug, eventDetails);
+      const fieldData = await buildEventFieldData(event, calendarSlug, eventDetails, locationIds, categoryIds);
 
-      await webflow.collections.items.createItemLive(process.env.EVENT_COLLECTION_ID, {
+      await webflow.collections.items.createItemLive(config.eventCollectionId, {
         fieldData: { slug: event.slug, ...fieldData }
       });
       console.log(`Created event ${event.name} in Webflow for calendar ${calendarSlug}`);
@@ -115,12 +119,13 @@ export async function createWebflowEvents(events, calendarSlug) {
   }
 }
 
-export async function updateWebflowEvent(eventId, event) {
+export async function updateWebflowEvent(eventId, event, config, locationIds, categoryIds) {
   try {
+    const webflow = getClient(config);
     const eventDetails = await fetchTockifyEventDetails(event.apiSlug, event.calendarSlug);
-    const fieldData = await buildEventFieldData(event, event.calendarSlug, eventDetails);
+    const fieldData = await buildEventFieldData(event, event.calendarSlug, eventDetails, locationIds, categoryIds);
 
-    await webflow.collections.items.updateItemsLive(process.env.EVENT_COLLECTION_ID, {
+    await webflow.collections.items.updateItemsLive(config.eventCollectionId, {
       items: [{
         id: eventId,
         fieldData
@@ -133,9 +138,10 @@ export async function updateWebflowEvent(eventId, event) {
   }
 }
 
-export async function deleteWebflowEvent(eventId) {
+export async function deleteWebflowEvent(eventId, config) {
   try {
-    await webflow.collections.items.deleteItems(process.env.EVENT_COLLECTION_ID, {
+    const webflow = getClient(config);
+    await webflow.collections.items.deleteItems(config.eventCollectionId, {
       items: [{ id: eventId }]
     });
     console.log(`Deleted event ${eventId} from Webflow.`);
@@ -145,34 +151,34 @@ export async function deleteWebflowEvent(eventId) {
   }
 }
 
-export async function fetchCategoriesFromWebflow() {
+export async function fetchCategoriesFromWebflow(config) {
   try {
-    const resp = await webflow.collections.items.listItemsLive(process.env.CATEGORIES_COLLECTION_ID);
+    const webflow = getClient(config);
+    const resp = await webflow.collections.items.listItemsLive(config.categoriesCollectionId);
 
-    const categories = resp.items.map(item => ({
+    return resp.items.map(item => ({
       id: item.id,
       name: item.fieldData.name,
       slug: item.fieldData.slug
     }));
-    return categories;
   } catch (error) {
     console.error('Error fetching categories collection items:', error);
     throw error;
   }
 }
 
-export async function fetchLocationsFromWebflow() {
+export async function fetchLocationsFromWebflow(config) {
   try {
-    console.log('Fetching locations from Webflow using collection ID:', process.env.LOCATION_COLLECTION_ID);
-    const resp = await webflow.collections.items.listItemsLive(process.env.LOCATION_COLLECTION_ID);
+    const webflow = getClient(config);
+    console.log('Fetching locations from Webflow using collection ID:', config.locationCollectionId);
+    const resp = await webflow.collections.items.listItemsLive(config.locationCollectionId);
 
-    const locations = resp.items.map(item => ({
+    return resp.items.map(item => ({
       id: item.id,
       name: item.fieldData.name,
       slug: item.fieldData.slug,
       calendarSlug: item.fieldData['calendar-slug']
     }));
-    return locations;
   } catch (error) {
     console.error('Error fetching locations collection items:', error);
     throw error;
