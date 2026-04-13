@@ -1,5 +1,5 @@
 {
-  "name": "tockify-sync-v2",
+  "name": "webflow-cms-tockify-sync",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",

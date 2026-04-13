@@ -1,4 +1,4 @@
-# tockify-sync-v2
+# webflow-cms-tockify-sync
 
 A serverless function that synchronizes calendar events from [Tockify](https://tockify.com) into a [Webflow](https://webflow.com) CMS collection. Designed to run as a scheduled Digital Ocean Function.
 

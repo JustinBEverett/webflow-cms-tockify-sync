@@ -46,50 +46,67 @@ export async function updateCalendarLastModified(id, newLastModified) {
 
 export async function getEventsFromWebflow(calendarSlug) {
   try {
-    const resp = await webflow.collections.items.listItems(process.env.EVENT_COLLECTION_ID);
+    const allItems = [];
+    let offset = 0;
+    const limit = 100;
 
-    const events = resp.items.filter(item => item.fieldData['calendar-slug'] === calendarSlug)
+    while (true) {
+      const resp = await webflow.collections.items.listItemsLive(process.env.EVENT_COLLECTION_ID, { limit, offset });
+      allItems.push(...resp.items);
+      if (resp.items.length < limit) break;
+      offset += limit;
+    }
+
+    return allItems
+      .filter(item => item.fieldData['calendar-slug'] === calendarSlug)
       .map(item => ({
         id: item.id,
         slug: item.fieldData.slug,
         lastModified: new Date(item.fieldData['last-modified']),
-        apiSlug: item.fieldData['api-slug']
+        apiSlug: item.fieldData['api-slug'],
+        recurring: item.fieldData['recurring'] || false
       }));
-    return events;
   } catch (error) {
     console.error('Error fetching event items:', error);
     throw error;
   }
 }
 
+async function buildEventFieldData(event, calendarSlug, eventDetails) {
+  return {
+    name: event.name,
+    'last-modified': event.lastModified.toISOString(),
+    'calendar-slug': calendarSlug,
+    'api-slug': event.apiSlug,
+    start: event.start.toISOString(),
+    end: event.end.toISOString(),
+    description: eventDetails.description || '',
+    excerpt: event.excerpt || '',
+    'image-url': event.imageUrl || '',
+    'cta-label': eventDetails.ctaLabel || '',
+    'cta-url': eventDetails.ctaUrl || '',
+    'feature-event': eventDetails.pinned || false,
+    'skip-details': eventDetails.skipDetails || false,
+    'recurring': eventDetails.recurring || false,
+    ...(locationIds ? { 'location-ref': locationIds?.find(loc => loc.calendarSlug === event.locationSlug)?.id } : {}),
+    ...(categoryIds
+      ? {
+        'categories-ref': (event.categories || [])
+          .map(cat => categoryIds.find(c => c.slug === slugify(cat, { lower: true, strict: true }))?.id)
+          .filter(Boolean)
+      }
+      : {})
+  };
+}
+
 export async function createWebflowEvents(events, calendarSlug) {
   for (const event of events) {
     try {
-      const eventDetails = await fetchTockifyEventDetails(event.apiSlug, event.calendarSlug)
+      const eventDetails = await fetchTockifyEventDetails(event.apiSlug, event.calendarSlug);
+      const fieldData = await buildEventFieldData(event, calendarSlug, eventDetails);
 
-      const newItem = await webflow.collections.items.createItemLive(process.env.EVENT_COLLECTION_ID, {
-        fieldData: {
-          name: event.name,
-          slug: event.slug,
-          'last-modified': event.lastModified.toISOString(),
-          'calendar-slug': calendarSlug,
-          'api-slug': event.apiSlug,
-          start: event.start.toISOString(),
-          end: event.end.toISOString(),
-          description: eventDetails.description || '',
-          excerpt: event.excerpt || '',
-          'image-url': event.imageUrl || '',
-          'cta-label': eventDetails.ctaLabel || '',
-          'cta-url': eventDetails.ctaUrl || '',
-          ...(locationIds ? { 'location-ref': locationIds?.find(loc => loc.calendarSlug === event.locationSlug)?.id } : {}),
-          ...(categoryIds
-            ? {
-              'categories-ref': (event.categories || [])
-                .map(cat => categoryIds.find(c => c.slug === slugify(cat, { lower: true, strict: true }))?.id)
-                .filter(Boolean)
-            }
-            : {})
-        }
+      await webflow.collections.items.createItemLive(process.env.EVENT_COLLECTION_ID, {
+        fieldData: { slug: event.slug, ...fieldData }
       });
       console.log(`Created event ${event.name} in Webflow for calendar ${calendarSlug}`);
     } catch (error) {
@@ -100,32 +117,13 @@ export async function createWebflowEvents(events, calendarSlug) {
 
 export async function updateWebflowEvent(eventId, event) {
   try {
-    const eventDetails = await fetchTockifyEventDetails(event.apiSlug, event.calendarSlug)
+    const eventDetails = await fetchTockifyEventDetails(event.apiSlug, event.calendarSlug);
+    const fieldData = await buildEventFieldData(event, event.calendarSlug, eventDetails);
 
     await webflow.collections.items.updateItemsLive(process.env.EVENT_COLLECTION_ID, {
       items: [{
         id: eventId,
-        fieldData: {
-          name: event.name,
-          'last-modified': event.lastModified.toISOString(),
-          'calendar-slug': event.calendarSlug,
-          'api-slug': event.apiSlug,
-          start: event.start.toISOString(),
-          end: event.end.toISOString(),
-          description: eventDetails.description || '',
-          excerpt: event.excerpt || '',
-          'image-url': event.imageUrl || '',
-          'cta-label': eventDetails.ctaLabel || '',
-          'cta-url': eventDetails.ctaUrl || '',
-          ...(locationIds ? { 'location-ref': locationIds?.find(loc => loc.calendarSlug === event.locationSlug)?.id } : {}),
-          ...(categoryIds
-            ? {
-              'categories-ref': (event.categories || [])
-                .map(cat => categoryIds.find(c => c.slug === slugify(cat, { lower: true, strict: true }))?.id)
-                .filter(Boolean)
-            }
-            : {})
-        }
+        fieldData
       }]
     });
     console.log(`Updated event ${eventId} in Webflow.`);
