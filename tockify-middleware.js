@@ -9,8 +9,12 @@ export async function fetchTockifyEventKind(tockifySlug, calendarSlug) {
     });
     return resp.data.events[0]?.kind || 'singleton';
   } catch (err) {
-    console.error(`Error fetching kind for ${tockifySlug}:`, err);
-    return 'singleton';
+    if (err.response?.status === 404) {
+      console.log(`Event ${tockifySlug} not found in Tockify (404), skipping.`);
+      return null;
+    }
+    console.error(`Error fetching kind for ${tockifySlug}:`, err.message);
+    return null;
   }
 }
 
@@ -34,7 +38,7 @@ export default async function fetchTockifyEventDetails(tockifySlug, calendarSlug
     }
     return eventDetails;
   } catch (err) {
-    console.error(`Error fetching Tockify event details for ${tockifySlug}:`, err);
+    console.error(`Error fetching Tockify event details for ${tockifySlug}:`, err.message);
     return null;
   }
 }

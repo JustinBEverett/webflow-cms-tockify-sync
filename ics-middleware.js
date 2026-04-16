@@ -3,7 +3,7 @@ import ical from "ical";
 import slugify from "slugify";
 
 const ICS_BASE_URL = "https://tockify.com/api/feeds/ics/";
-const EVENT_HORIZON = 60; // Number of days in the future to include events
+const EVENT_HORIZON = 90; // Number of days in the future to include events
 
 export default async function fetchIcsFeed(feedSlug, instanceSlug = '') {
   try {

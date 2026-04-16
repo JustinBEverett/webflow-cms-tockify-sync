@@ -40,6 +40,11 @@ async function deduplicateByKind(events) {
 
     for (const ev of sorted) {
       const kind = await fetchTockifyEventKind(ev.apiSlug, ev.calendarSlug);
+      if (kind === null) {
+        console.log(`Event ${ev.name} (${ev.apiSlug}) not found in Tockify, including as singleton.`);
+        result.push(ev);
+        break;
+      }
       if (kind === 'mod') {
         result.push(ev);
       } else if (kind === 'repeat') {
@@ -127,8 +132,7 @@ async function syncInstance(config) {
             try {
               await deleteWebflowEvent(ev.id, config);
             } catch (err) {
-              console.error(`Error deleting event ${ev.apiSlug}:`, err);
-              throw err;
+              console.error(`Error deleting event ${ev.apiSlug}: ${err.message}`);
             }
           }
         }

@@ -146,8 +146,11 @@ export async function deleteWebflowEvent(eventId, config) {
     });
     console.log(`Deleted event ${eventId} from Webflow.`);
   } catch (error) {
-    console.error(`Error deleting event ${eventId} from Webflow:`, error);
-    throw error;
+    if (error.statusCode === 404) {
+      console.log(`Event ${eventId} already gone from Webflow, skipping delete.`);
+      return;
+    }
+    throw new Error(`Failed to delete Webflow event ${eventId}: ${error.body?.message || error.message}`);
   }
 }
 
