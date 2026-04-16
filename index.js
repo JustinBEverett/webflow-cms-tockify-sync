@@ -55,6 +55,7 @@ async function deduplicateByKind(events) {
 function buildConfigFromEnv() {
   return {
     siteToken: process.env.SITE_TOKEN,
+    instanceSlug: process.env.INSTANCE_SLUG || '',
     calendarCollectionId: process.env.CALENDAR_COLLECTION_ID,
     eventCollectionId: process.env.EVENT_COLLECTION_ID,
     categoriesCollectionId: process.env.CATEGORIES_COLLECTION_ID,
@@ -73,7 +74,7 @@ async function syncInstance(config) {
   for (const calendar of calendars) {
 
     console.log(`Fetching ICS feed for calendar: ${calendar.name} (${calendar.slug})`);
-    const icsData = await fetchIcsFeed(calendar.slug);
+    const icsData = await fetchIcsFeed(calendar.slug, config.instanceSlug);
     console.log(`Fetched ${icsData.events.length} raw events for calendar: ${calendar.name}`);
 
     // Check if calendar needs updating
@@ -148,4 +149,4 @@ export async function main(event = {}) {
     logContext.run(config.instanceSlug ?? 'default', () => syncInstance(config))
   ));
 }
-//main();
+main();

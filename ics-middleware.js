@@ -4,22 +4,29 @@ import slugify from "slugify";
 
 const ICS_BASE_URL = "https://tockify.com/api/feeds/ics/";
 const EVENT_HORIZON = 60; // Number of days in the future to include events
-const INSTANCE_SLUG = process.env.INSTANCE_SLUG || '';
 
-export default async function fetchIcsFeed(feedSlug) {
+export default async function fetchIcsFeed(feedSlug, instanceSlug = '') {
   try {
     const res = await axios.get(`${ICS_BASE_URL}${feedSlug}`);
     const headers = res.headers;
     const data = ical.parseICS(res.data);
 
     const now = new Date();
-    const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + EVENT_HORIZON);
+    // Use UTC midnight for both boundaries so ICS UTC times are compared consistently
+    // regardless of what timezone the DO runtime is in
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const horizonUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + EVENT_HORIZON);
 
     const events = Object.values(data)
       .filter((ev) => ev.type === "VEVENT")
-      .filter((ev) => new Date(ev.end) >= now)
-      .filter((ev) => new Date(ev.start) <= horizon)
-      .filter((ev) => !(feedSlug !== INSTANCE_SLUG && (ev.categories || []).includes("U-Prevent-Merge")))
+      .filter((ev) => {
+        const start = new Date(ev.start);
+        const end = new Date(ev.end);
+        const startDayUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+        const endDayUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+        return endDayUTC >= todayUTC && startDayUTC <= horizonUTC;
+      })
+      .filter((ev) => !instanceSlug || feedSlug === instanceSlug || !(ev.categories || []).includes("U-Prevent-Merge"))
       .map((ev) => {
         const urlParts = ev.url ? ev.url.split("/").slice(-2) : ['', '0'];
         return {
