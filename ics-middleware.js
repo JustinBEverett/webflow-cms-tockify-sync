@@ -24,7 +24,7 @@ export default async function fetchIcsFeed(feedSlug, instanceSlug = '') {
         const end = new Date(ev.end);
         const startDayUTC = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
         const endDayUTC = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
-        return endDayUTC >= todayUTC && startDayUTC <= horizonUTC;
+        return endDayUTC > todayUTC && startDayUTC <= horizonUTC;
       })
       .filter((ev) => !instanceSlug || feedSlug === instanceSlug || !(ev.categories || []).includes("U-Prevent-Merge"))
       .map((ev) => {

@@ -19,7 +19,8 @@ export async function fetchCalendars(config) {
       id: item.id,
       name: item.fieldData.name,
       slug: item.fieldData.slug,
-      lastModified: item.fieldData['last-modified']
+      lastModified: item.fieldData['last-modified'],
+      icsHash: item.fieldData['ics-hash'] || ''
     }));
   } catch (error) {
     console.error('Error fetching collection items:', error);
@@ -27,14 +28,15 @@ export async function fetchCalendars(config) {
   }
 }
 
-export async function updateCalendarLastModified(id, newLastModified, config) {
+export async function updateCalendarLastModified(id, newLastModified, icsHash, config) {
   try {
     const webflow = getClient(config);
     await webflow.collections.items.updateItemsLive(config.calendarCollectionId, {
       items: [{
         id: id,
         fieldData: {
-          'last-modified': newLastModified.toISOString()
+          'last-modified': newLastModified.toISOString(),
+          'ics-hash': icsHash
         }
       }]
     });
@@ -75,6 +77,7 @@ export async function getEventsFromWebflow(calendarSlug, config) {
 }
 
 async function buildEventFieldData(event, calendarSlug, eventDetails, locationIds, categoryIds) {
+  eventDetails = eventDetails || {};
   return {
     name: event.name,
     'last-modified': event.lastModified.toISOString(),

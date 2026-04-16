@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks';
+import { createHash } from 'crypto';
 import fetchIcsFeed from "./ics-middleware.js";
 
 const logContext = new AsyncLocalStorage();
@@ -82,13 +83,19 @@ async function syncInstance(config) {
     const icsData = await fetchIcsFeed(calendar.slug, config.instanceSlug);
     console.log(`Fetched ${icsData.events.length} raw events for calendar: ${calendar.name}`);
 
+    // Compute a hash of the filtered event slugs to detect filter-level changes
+    // even when the ICS feed's last-modified timestamp hasn't changed
+    const icsHash = createHash('md5')
+      .update(icsData.events.map(ev => ev.apiSlug).sort().join(','))
+      .digest('hex');
+
     // Check if calendar needs updating
     const icsDate = new Date(icsData.headers['last-modified']);
     const webflowDate = calendar.lastModified ? new Date(calendar.lastModified) : new Date(0);
     const delta = icsDate - webflowDate;
-    console.log(`ICS last modified: ${icsDate}, Webflow last modified: ${webflowDate}, Delta: ${delta} ms`);
+    console.log(`ICS last modified: ${icsDate}, Webflow last modified: ${webflowDate}, Delta: ${delta} ms, Hash: ${icsHash} (stored: ${calendar.icsHash})`);
 
-    if (delta <= 0) {
+    if (delta <= 0 && icsHash === calendar.icsHash) {
       console.log(`Calendar ${calendar.name} is up to date. Skipping.`);
       continue;
     }
@@ -139,7 +146,7 @@ async function syncInstance(config) {
       }
 
       console.log(`Updating calendar ${calendar.name} last modified to ${icsDate.toISOString()}`);
-      await updateCalendarLastModified(calendar.id, icsDate, config);
+      await updateCalendarLastModified(calendar.id, icsDate, icsHash, config);
 
     } catch (err) {
       console.error(`Error syncing calendar ${calendar.name}:`, err);
