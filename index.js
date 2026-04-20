@@ -15,7 +15,8 @@ import {
   createWebflowEvents,
   updateCalendarLastModified,
   updateWebflowEvent,
-  deleteWebflowEvent
+  deleteWebflowEvent,
+  publishSite
 } from "./webflow-middleware.js";
 import { fetchTockifyEventKind } from "./tockify-middleware.js";
 
@@ -66,6 +67,7 @@ function buildConfigFromEnv() {
     eventCollectionId: process.env.EVENT_COLLECTION_ID,
     categoriesCollectionId: process.env.CATEGORIES_COLLECTION_ID,
     locationCollectionId: process.env.LOCATION_COLLECTION_ID,
+    siteId: process.env.SITE_ID
   };
 }
 
@@ -152,6 +154,9 @@ async function syncInstance(config) {
       console.error(`Error syncing calendar ${calendar.name}:`, err);
     }
   }
+
+  console.log(`Publishing site ${config.INSTANCE_SLUG}`);
+  await publishSite(config);
 }
 
 export async function main(event = {}) {

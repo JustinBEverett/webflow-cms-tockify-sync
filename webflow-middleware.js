@@ -2,6 +2,7 @@ import { WebflowClient } from 'webflow-api';
 import dotenv from 'dotenv';
 import fetchTockifyEventDetails from './tockify-middleware.js';
 import slugify from 'slugify';
+import { TriggerType } from 'webflow-api/api/index.js';
 
 dotenv.config();
 
@@ -188,5 +189,38 @@ export async function fetchLocationsFromWebflow(config) {
   } catch (error) {
     console.error('Error fetching locations collection items:', error);
     throw error;
+  }
+}
+
+export async function publishSite(config){
+  try{
+    const webflow = getClient(config);
+    const domains = await getCustomDomains(config)
+
+    console.log('Publishing site with Site ID:', config.siteId)
+    const resp = await webflow.sites.publish(config.siteId, {
+      customDomains: domains,
+      publishToWebflowSubdomain: true
+    })
+  } catch (error) {
+    console.error('Error publishing site:' , error);
+    throw error;
+  }
+}
+
+export async function getCustomDomains(config){
+  try{
+    const webflow = getClient(config);
+    console.log('Fetching custom domains for site:', config.siteId)
+    const resp = await webflow.sites.getCustomDomain(config.siteId)
+    const domainIds = resp.customDomains.map((domain) => {
+      return domain.id
+    })
+
+    console.log('Fetched domains:', domainIds)
+    return domainIds
+  } catch (error) {
+    console.error('Error fetching custom domains:', error)
+    throw error
   }
 }
