@@ -175,4 +175,3 @@ export async function main(event = {}) {
     });
   }
 }
-main();
