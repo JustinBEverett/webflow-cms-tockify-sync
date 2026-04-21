@@ -192,18 +192,19 @@ export async function fetchLocationsFromWebflow(config) {
   }
 }
 
-export async function publishSite(config){
-  try{
-    const webflow = getClient(config);
-    const domains = await getCustomDomains(config)
+export async function publishSite(config) {
+  const webflow = getClient(config);
+  const domains = await getCustomDomains(config);
 
-    console.log('Publishing site with Site ID:', config.siteId)
-    const resp = await webflow.sites.publish(config.siteId, {
+  console.log('Publishing site with Site ID:', config.siteId);
+
+  try {
+    await webflow.sites.publish(config.siteId, {
       customDomains: domains,
       publishToWebflowSubdomain: true
-    })
+    });
   } catch (error) {
-    console.error('Error publishing site:' , error);
+    console.error('Error publishing site:', error.body?.message || error.message);
     throw error;
   }
 }

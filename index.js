@@ -155,14 +155,24 @@ async function syncInstance(config) {
     }
   }
 
-  console.log(`Publishing site ${config.INSTANCE_SLUG}`);
-  await publishSite(config);
 }
 
 export async function main(event = {}) {
   const instances = event.instances || [buildConfigFromEnv()];
+
+  // Run all syncs in parallel
   await Promise.all(instances.map(config =>
     logContext.run(config.instanceSlug ?? 'default', () => syncInstance(config))
   ));
+
+  // Publish sequentially with 60s gap to stay within Webflow's 1/min rate limit
+  for (let i = 0; i < instances.length; i++) {
+    if (i > 0) await new Promise(resolve => setTimeout(resolve, 61000));
+    const config = instances[i];
+    await logContext.run(config.instanceSlug ?? 'default', async () => {
+      console.log(`Publishing site for instance: ${config.instanceSlug || 'default'}`);
+      await publishSite(config);
+    });
+  }
 }
 main();
